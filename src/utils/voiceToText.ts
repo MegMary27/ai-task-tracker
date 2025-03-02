@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const DEEPGRAM_API_KEY = process.env.REACT_APP_DEEPGRAM_API_KEY;
+const DEEPGRAM_API_KEY = "400e0c946fd2fcfcb032e4ef4153e5175c73d12f";
 
 export const getTranscriptionFromVoice = async (audioBlob: Blob): Promise<string> => {
   try {

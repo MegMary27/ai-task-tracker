@@ -4,7 +4,8 @@ import { doc, setDoc } from "firebase/firestore";
 import { getTranscriptionFromVoice } from "../utils/voiceToText";
 import { extractTaskDetails } from "../utils/llmExtraction";
 
-const TaskCreation: React.FC<{ uid: string }> = ({ uid }) => {
+const TaskCreation: React.FC<{ uid?: string }> = ({ uid = "" }) => { 
+
   const [task_type, setTaskType] = useState("casual");
   const [taskData, setTaskData] = useState({
     task_name: "",
