@@ -11,7 +11,7 @@ interface Task {
   estimated_duration: string;
   task_description: string;
   difficulty_level: string;
-  priority_level: string;
+  priority_level: string; // Added for sorting by priority
   status: string; // "finished" or "unfinished"
   task_type: string; // "casual" or "official"
 }
@@ -29,6 +29,7 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
   });
   const [casualTasks, setCasualTasks] = useState<Task[]>([]);
   const [officialTasks, setOfficialTasks] = useState<Task[]>([]);
+  const [sortOption, setSortOption] = useState("priority"); // Default to "priority"
 
   // Fetch tasks from Firestore for the dashboard
   useEffect(() => {
@@ -103,6 +104,27 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
     }
   };
 
+  // Sort tasks based on the selected option
+  const sortTasks = (tasks: Task[]) => {
+    if (sortOption === "priority") {
+      return [...tasks].sort((a, b) => {
+        const priorityOrder: { [key: string]: number } = {
+          low: 1,
+          medium: 2,
+          high: 3,
+        };
+        return priorityOrder[b.priority_level] - priorityOrder[a.priority_level];
+      });
+    } else if (sortOption === "deadline") {
+      return [...tasks].sort((a, b) => {
+        const dateA = new Date(a.task_deadline);
+        const dateB = new Date(b.task_deadline);
+        return dateA.getTime() - dateB.getTime();
+      });
+    }
+    return tasks;
+  };
+
   return (
     <div>
       <div>
@@ -166,12 +188,19 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
       <div>
         <h2>User Dashboard</h2>
 
+        {/* Sort Dropdown */}
+        <label>Sort By:</label>
+        <select value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+          <option value="priority">Priority</option>
+          <option value="deadline">Deadline</option>
+        </select>
+
         {/* Casual Tasks */}
         <section>
           <h3>Casual Tasks</h3>
-          {casualTasks.length > 0 ? (
+          {sortTasks(casualTasks).length > 0 ? (
             <ul>
-              {casualTasks.map((task) => (
+              {sortTasks(casualTasks).map((task) => (
                 <li key={task.id}>
                   <strong>{task.task_name}</strong> - {task.task_deadline} <br />
                   <small>{task.task_description}</small>
@@ -193,9 +222,9 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
         {/* Official Tasks */}
         <section>
           <h3>Official Tasks</h3>
-          {officialTasks.length > 0 ? (
+          {sortTasks(officialTasks).length > 0 ? (
             <ul>
-              {officialTasks.map((task) => (
+              {sortTasks(officialTasks).map((task) => (
                 <li key={task.id}>
                   <strong>{task.task_name}</strong> - {task.task_deadline} <br />
                   <small>{task.task_description}</small>
