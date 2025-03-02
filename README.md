@@ -3,7 +3,7 @@
 The AI Task Tracker project helps users manage and prioritize their tasks based on AI-driven task tracking, voice input, and task scheduling. This project includes both a backend (Python with virtual environment) and a frontend (React with Vite).
 
 ### Project Structure
-ai-task-tracker/ │ ├── backend/ # Python backend with virtual environment │ ├── venv/ # Virtual environment for backend dependencies │ ├── requirements.txt # Backend dependencies │ ├── app.py # Backend main file │ └── ... │ ├── frontend/ # React frontend with Vite │ ├── package.json # Frontend dependencies │ ├── vite.config.ts # Vite configuration file │ └── ... │ └── README.md #
+```ai-task-tracker/ │ ├── backend/ # Python backend with virtual environment │ ├── venv/ # Virtual environment for backend dependencies │ ├── requirements.txt # Backend dependencies │ ├── app.py # Backend main file │ └── ... # Other backend files │ ├── frontend/ # React frontend with Vite │ ├── node_modules/ # Node.js modules │ ├── public/ # Public files (index.html, assets, etc.) │ ├── src/ # Source files (components, hooks, etc.) │ ├── package.json # Frontend dependencies │ ├── vite.config.ts # Vite configuration file │ └── ... # Other frontend files │ └── README.md```
 
 
 ---
