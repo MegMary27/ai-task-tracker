@@ -1,13 +1,20 @@
 import React from "react";
-import Signup from "./components/Signup"; // Ensure you have the Signup component
+import { BrowserRouter as Router, Routes, Route} from "react-router-dom";
+import Signup from "./components/Signup";
+import TaskCreation from "./components/TaskCreation";
 
-function App() {
+const App: React.FC = () => {
   return (
-    <div>
-      <h1>Task Tracker</h1>
-      <Signup />
-    </div>
+    <Router>
+      <div>
+        <h1>Task Tracker</h1>
+        <Routes>
+          <Route path="/" element={<Signup />} />
+          <Route path="/task-creation" element={<TaskCreation uid={""} />} />
+        </Routes>
+      </div>
+    </Router>
   );
-}
+};
 
 export default App;

@@ -25,4 +25,4 @@ dist-ssr
 *.sw?
 
 # Virtual Environment (Exclude venv)
-venv/
+backend/venv/

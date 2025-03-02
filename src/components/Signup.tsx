@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -38,6 +39,8 @@ const Signup: React.FC = () => {
     workstyle: "",
   });
 
+  const navigate = useNavigate(); // Hook for navigation
+
   const signUp = async () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -51,6 +54,9 @@ const Signup: React.FC = () => {
       });
 
       alert("Signup Successful!");
+
+      // Redirect to Task Creation page
+      navigate("/task-creation");
     } catch (error) {
       console.error("Signup Error:", error);
     }
