@@ -15,9 +15,11 @@ export const extractTaskDetails = async (text: string) => {
         "estimated_duration": "",
         "task_description": "",
         "difficulty_level": "",
-        "priority_level": ""
+        "priority_level": "",
+        "status":""
       }
-
+        
+      -return status field as "unfinished" always
       - If any field is missing, return **null** for that field.
       - Output **only the JSON**, nothing else.
 

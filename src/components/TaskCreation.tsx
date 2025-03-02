@@ -13,6 +13,7 @@ const TaskCreation: React.FC<{ uid?: string }> = ({ uid = "" }) => {
     task_description: "",
     difficulty_level: "",
     priority_level: "",
+    status:""
   });
 
   const handleVoiceInput = async (audioBlob: Blob) => {
@@ -38,6 +39,7 @@ const TaskCreation: React.FC<{ uid?: string }> = ({ uid = "" }) => {
       await setDoc(doc(db, "tasks", `${uid}-${Date.now()}`), {
         ...taskToSave,
         task_type,
+        status: "unfinished",
         uid,
       });
       alert("Task Created Successfully!");
@@ -62,7 +64,7 @@ const TaskCreation: React.FC<{ uid?: string }> = ({ uid = "" }) => {
       <input type="text" placeholder="Task Description" value={taskData.task_description} onChange={(e) => setTaskData({ ...taskData, task_description: e.target.value })} />
       <input type="text" placeholder="Difficulty Level" value={taskData.difficulty_level} onChange={(e) => setTaskData({ ...taskData, difficulty_level: e.target.value })} />
       <input type="text" placeholder="Priority Level" value={taskData.priority_level} onChange={(e) => setTaskData({ ...taskData, priority_level: e.target.value })} />
-
+    
       {/* Voice Input */}
       <button onClick={() => document.getElementById("voiceInput")?.click()}>Record Voice Input</button>
       <input type="file" id="voiceInput" accept="audio/*" onChange={(e) => handleVoiceInput(e.target.files![0])} hidden />
