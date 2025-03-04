@@ -104,6 +104,7 @@ export async function generateAISchedule(input: ScheduleInput): Promise<Task[]> 
       3. Considers the user's preferences and work style
       4. Maximizes productivity within the given time constraint
       5. Add Breaks or timeframes for rest in the schedule to optimise productivity
+      6. If there is extra time, then give more rest breaks and inform user that they do not need this much time and end the schedule as needed without repetition of same task
       
       Return the schedule as a JSON array with the following structure for each task:
       [

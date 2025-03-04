@@ -1,23 +1,29 @@
+/* Root container styling */
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  background-color: #e7ebfb; /* Light background for better contrast */
 }
 
+/* Logo styling */
 .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+/* Logo spin animation */
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
@@ -27,16 +33,57 @@
   }
 }
 
+/* Animation preference for links */
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
 }
 
+/* Card styling for main content */
 .card {
   padding: 2em;
+  background-color: white; /* White background for cards */
+  border-radius: 0.5em; /* Rounded corners */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  margin: 1.5em 0; /* Spacing between cards */
 }
 
+/* Read the docs link styling */
 .read-the-docs {
   color: #888;
+}
+
+/* Navigation link styling */
+nav ul {
+  list-style: none; /* Remove default list styling */
+  padding: 0; /* Remove padding */
+}
+
+nav ul li {
+  display: inline-block; /* Inline block for horizontal layout */
+}
+
+nav a {
+  text-decoration: none; /* Remove underline from links */
+  color: rgb(27, 10, 10); /* White text for links */
+  padding: 0.75em 1.5em; /* Padding for links */
+  border-radius: 0.5em; /* Rounded corners */
+  transition: background-color 300ms, transform 300ms; /* Smooth transitions */
+}
+
+nav a:hover {
+  transform: scale(1.05); /* Slightly enlarge on hover */
+  background-color: #4f8ef7; /* Darker blue on hover */
+}
+
+/* Footer styling */
+footer {
+  background-color: white; /* White background for footer */
+  padding: 1.5em 0; /* Padding for footer */
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for separation */
+}
+
+footer p {
+  color: #666; /* Darker gray for footer text */
 }
