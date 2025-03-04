@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { doc, setDoc, collection, query, where, onSnapshot, updateDoc } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getTranscriptionFromVoice } from "../utils/voiceToText";
 import { extractTaskDetails } from "../utils/llmExtraction";
 
@@ -11,12 +12,13 @@ interface Task {
   estimated_duration: string;
   task_description: string;
   difficulty_level: string;
-  priority_level: string; // Added for sorting by priority
+  priority_level: string;
   status: string; // "finished" or "unfinished"
   task_type: string; // "casual" or "official"
 }
 
-const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
+const TaskCreationAndDashboard: React.FC = () => {
+  const [uid, setUid] = useState<string | null>(null);
   const [task_type, setTaskType] = useState("casual");
   const [taskData, setTaskData] = useState({
     task_name: "",
@@ -29,7 +31,20 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
   });
   const [casualTasks, setCasualTasks] = useState<Task[]>([]);
   const [officialTasks, setOfficialTasks] = useState<Task[]>([]);
-  const [sortOption, setSortOption] = useState("priority"); // Default to "priority"
+  const [sortOption, setSortOption] = useState("priority");
+
+  // Fetch logged-in user UID
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUid(user.uid);
+      } else {
+        setUid(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Fetch tasks from Firestore for the dashboard
   useEffect(() => {
@@ -37,24 +52,15 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
 
     const tasksRef = collection(db, "tasks");
 
-    // Query for casual tasks (status = unfinished)
     const casualQuery = query(tasksRef, where("uid", "==", uid), where("task_type", "==", "casual"), where("status", "==", "unfinished"));
     const officialQuery = query(tasksRef, where("uid", "==", uid), where("task_type", "==", "official"), where("status", "==", "unfinished"));
 
     const unsubscribeCasual = onSnapshot(casualQuery, (snapshot) => {
-      const fetchedCasualTasks: Task[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Task[];
-      setCasualTasks(fetchedCasualTasks);
+      setCasualTasks(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Task[]);
     });
 
     const unsubscribeOfficial = onSnapshot(officialQuery, (snapshot) => {
-      const fetchedOfficialTasks: Task[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Task[];
-      setOfficialTasks(fetchedOfficialTasks);
+      setOfficialTasks(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Task[]);
     });
 
     return () => {
@@ -73,7 +79,7 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
 
       if (extractedData) {
         setTaskData(extractedData);
-        await saveTask(extractedData); // Save immediately after voice input
+        await saveTask(extractedData);
       }
     } catch (error) {
       console.error("Error in handleVoiceInput:", error);
@@ -81,6 +87,11 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
   };
 
   const saveTask = async (taskToSave = taskData) => {
+    if (!uid) {
+      alert("You must be logged in to create tasks.");
+      return;
+    }
+
     try {
       await setDoc(doc(db, "tasks", `${uid}-${Date.now()}`), {
         ...taskToSave,
@@ -107,23 +118,17 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
   // Sort tasks based on the selected option
   const sortTasks = (tasks: Task[]) => {
     if (sortOption === "priority") {
-      return [...tasks].sort((a, b) => {
-        const priorityOrder: { [key: string]: number } = {
-          low: 1,
-          medium: 2,
-          high: 3,
-        };
-        return priorityOrder[b.priority_level] - priorityOrder[a.priority_level];
-      });
+      const priorityOrder: { [key: string]: number } = { low: 1, medium: 2, high: 3 };
+      return [...tasks].sort((a, b) => priorityOrder[b.priority_level] - priorityOrder[a.priority_level]);
     } else if (sortOption === "deadline") {
-      return [...tasks].sort((a, b) => {
-        const dateA = new Date(a.task_deadline);
-        const dateB = new Date(b.task_deadline);
-        return dateA.getTime() - dateB.getTime();
-      });
+      return [...tasks].sort((a, b) => new Date(a.task_deadline).getTime() - new Date(b.task_deadline).getTime());
     }
     return tasks;
   };
+
+  if (uid === null) {
+    return <p>Please log in to create and manage tasks.</p>;
+  }
 
   return (
     <div>
@@ -135,52 +140,15 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
           <option value="official">Official</option>
         </select>
 
-        <input
-          type="text"
-          placeholder="Task Name"
-          value={taskData.task_name}
-          onChange={(e) => setTaskData({ ...taskData, task_name: e.target.value })}
-        />
-        <input
-          type="date"
-          value={taskData.task_deadline}
-          onChange={(e) => setTaskData({ ...taskData, task_deadline: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Estimated Duration"
-          value={taskData.estimated_duration}
-          onChange={(e) => setTaskData({ ...taskData, estimated_duration: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Task Description"
-          value={taskData.task_description}
-          onChange={(e) => setTaskData({ ...taskData, task_description: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Difficulty Level"
-          value={taskData.difficulty_level}
-          onChange={(e) => setTaskData({ ...taskData, difficulty_level: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Priority Level"
-          value={taskData.priority_level}
-          onChange={(e) => setTaskData({ ...taskData, priority_level: e.target.value })}
-        />
+        <input type="text" placeholder="Task Name" value={taskData.task_name} onChange={(e) => setTaskData({ ...taskData, task_name: e.target.value })} />
+        <input type="date" value={taskData.task_deadline} onChange={(e) => setTaskData({ ...taskData, task_deadline: e.target.value })} />
+        <input type="text" placeholder="Estimated Duration" value={taskData.estimated_duration} onChange={(e) => setTaskData({ ...taskData, estimated_duration: e.target.value })} />
+        <input type="text" placeholder="Task Description" value={taskData.task_description} onChange={(e) => setTaskData({ ...taskData, task_description: e.target.value })} />
+        <input type="text" placeholder="Difficulty Level" value={taskData.difficulty_level} onChange={(e) => setTaskData({ ...taskData, difficulty_level: e.target.value })} />
+        <input type="text" placeholder="Priority Level" value={taskData.priority_level} onChange={(e) => setTaskData({ ...taskData, priority_level: e.target.value })} />
 
-        <button onClick={() => document.getElementById("voiceInput")?.click()}>
-          Record Voice Input
-        </button>
-        <input
-          type="file"
-          id="voiceInput"
-          accept="audio/*"
-          onChange={(e) => handleVoiceInput(e.target.files![0])}
-          hidden
-        />
+        <button onClick={() => document.getElementById("voiceInput")?.click()}>Record Voice Input</button>
+        <input type="file" id="voiceInput" accept="audio/*" onChange={(e) => handleVoiceInput(e.target.files![0])} hidden />
 
         <button onClick={() => saveTask()}>Save Task</button>
       </div>
@@ -204,13 +172,8 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
                 <li key={task.id}>
                   <strong>{task.task_name}</strong> - {task.task_deadline} <br />
                   <small>{task.task_description}</small>
-                  <label>
-                    <input
-                      type="checkbox"
-                      onChange={() => markTaskAsFinished(task.id)}
-                    />
-                    Mark as Finished
-                  </label>
+                  <input type="checkbox" onChange={() => markTaskAsFinished(task.id)} />
+                  Mark as Finished
                 </li>
               ))}
             </ul>
@@ -228,13 +191,8 @@ const TaskCreationAndDashboard: React.FC<{ uid?: string }> = ({ uid = "" }) => {
                 <li key={task.id}>
                   <strong>{task.task_name}</strong> - {task.task_deadline} <br />
                   <small>{task.task_description}</small>
-                  <label>
-                    <input
-                      type="checkbox"
-                      onChange={() => markTaskAsFinished(task.id)}
-                    />
-                    Mark as Finished
-                  </label>
+                  <input type="checkbox" onChange={() => markTaskAsFinished(task.id)} />
+                  Mark as Finished
                 </li>
               ))}
             </ul>
