@@ -96,13 +96,14 @@ export async function generateAISchedule(input: ScheduleInput): Promise<Task[]> 
       CONSTRAINTS:
       - Total productivity duration available: ${productivityDuration} minutes
       - Need to create a schedule that fits within this time limit
-      - Start time is the current time
+      - Start time is the current time according to Indian Standard Time  
       
       Based on all this information, create an optimal schedule that:
       1. Takes into account the user's current mood and energy levels
       2. Prioritizes tasks appropriately based on deadlines, difficulty, and the user's current state
       3. Considers the user's preferences and work style
       4. Maximizes productivity within the given time constraint
+      5. Add Breaks or timeframes for rest in the schedule to optimise productivity
       
       Return the schedule as a JSON array with the following structure for each task:
       [
@@ -127,9 +128,10 @@ export async function generateAISchedule(input: ScheduleInput): Promise<Task[]> 
 
     // Generate response from AI
     const result = await model.generateContent(prompt);
-    console.log(result);
+    
     const response = await result.response;
     const text = response.text();
+    console.log(text);
     
     // Extract JSON from the response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -158,6 +160,7 @@ const generateFallbackSchedule = (input: ScheduleInput): Task[] => {
   let remainingTime = productivityDuration;
   let scheduled: Task[] = [];
   let currentTime = new Date();
+  console.log("backup working not AI");
   
   // Create a copy of tasks to work with
   let tasksToSchedule = [...tasks];
