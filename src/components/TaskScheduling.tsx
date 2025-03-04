@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { Clock, Calendar, Smile, List, ArrowRight } from "lucide-react";
+import { Clock, Calendar, Smile, List, ArrowRight, Brain, Activity, BatteryMedium, Coffee } from "lucide-react";
+import { generateAISchedule } from "../utils/aiScheduler";
 
 interface Task {
   id: string;
@@ -18,14 +19,47 @@ interface Task {
   scheduledTime?: string;
 }
 
+interface UserData {
+  age?: string;
+  gender?: string;
+  occupation?: string;
+  dislikes?: string[];
+  hobbies?: string[];
+  peek_hour_productivity?: string[];
+  preferred_task_type?: string[];
+  sleep_routine?: string;
+  strengths?: string[];
+  stress_handling?: string;
+  task_prioritization_style?: string;
+  workstyle?: string;
+}
+
+interface MoodAssessment {
+  exhaustion: number;
+  motivation: number;
+  focus: number;
+  stress: number;
+  currentFeeling: string;
+}
+
 const TaskScheduling: React.FC = () => {
   const [uid, setUid] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userData, setUserData] = useState<UserData>({});
   const [productivityDuration, setProductivityDuration] = useState<number>(60); // in minutes
   const [schedulingMethod, setSchedulingMethod] = useState<"deadline" | "mood">("deadline");
-  const [mood, setMood] = useState<"energetic" | "neutral" | "tired">("neutral");
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([]);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isAssessingMood, setIsAssessingMood] = useState(false);
+  
+  // Mood assessment state
+  const [moodAssessment, setMoodAssessment] = useState<MoodAssessment>({
+    exhaustion: 5,
+    motivation: 5,
+    focus: 5,
+    stress: 5,
+    currentFeeling: ""
+  });
 
   // Fetch logged-in user UID
   useEffect(() => {
@@ -39,6 +73,26 @@ const TaskScheduling: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Fetch user data from Firestore
+  useEffect(() => {
+    if (!uid) return;
+
+    const fetchUserData = async () => {
+      try {
+        const userDocRef = doc(db, "users", uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          setUserData(userDoc.data() as UserData);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [uid]);
 
   // Fetch unfinished tasks from Firestore
   useEffect(() => {
@@ -59,23 +113,55 @@ const TaskScheduling: React.FC = () => {
     return () => unsubscribe();
   }, [uid]);
 
-  const generateSchedule = () => {
+  const startMoodAssessment = () => {
+    setIsAssessingMood(true);
+  };
+
+  const handleMoodAssessmentChange = (field: keyof MoodAssessment, value: any) => {
+    setMoodAssessment(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const generateSchedule = async () => {
     setIsScheduling(true);
     
+    try {
+      if (schedulingMethod === "deadline") {
+        // Sort by deadline (earliest first)
+        const deadlineSchedule = generateDeadlineBasedSchedule();
+        setScheduledTasks(deadlineSchedule);
+      } else if (schedulingMethod === "mood") {
+        // Use AI to generate a personalized schedule based on mood assessment
+        const aiSchedule = await generateAISchedule({
+          tasks,
+          userData,
+          moodAssessment,
+          productivityDuration
+        });
+        
+        setScheduledTasks(aiSchedule);
+      }
+    } catch (error) {
+      console.error("Error generating schedule:", error);
+      alert("Failed to generate schedule. Please try again.");
+    } finally {
+      setIsScheduling(false);
+      setIsAssessingMood(false);
+    }
+  };
+
+  const generateDeadlineBasedSchedule = () => {
     // Make a copy of tasks to work with
     let tasksToSchedule = [...tasks];
     let remainingTime = productivityDuration;
     let scheduled: Task[] = [];
 
-    if (schedulingMethod === "deadline") {
-      // Sort by deadline (earliest first)
-      tasksToSchedule.sort((a, b) => 
-        new Date(a.task_deadline).getTime() - new Date(b.task_deadline).getTime()
-      );
-    } else if (schedulingMethod === "mood") {
-      // Sort based on mood and difficulty level
-      tasksToSchedule = sortTasksByMood(tasksToSchedule, mood);
-    }
+    // Sort by deadline (earliest first)
+    tasksToSchedule.sort((a, b) => 
+      new Date(a.task_deadline).getTime() - new Date(b.task_deadline).getTime()
+    );
 
     // Schedule tasks until we run out of time
     let currentTime = new Date();
@@ -102,24 +188,7 @@ const TaskScheduling: React.FC = () => {
       }
     }
 
-    setScheduledTasks(scheduled);
-    setIsScheduling(false);
-  };
-
-  const sortTasksByMood = (tasks: Task[], currentMood: string): Task[] => {
-    // Define difficulty weights based on mood
-    const difficultyWeights: {[key: string]: {[key: string]: number}} = {
-      energetic: { high: 1, medium: 2, low: 3 }, // When energetic, prefer difficult tasks
-      neutral: { medium: 1, high: 2, low: 3 },   // When neutral, prefer medium difficulty
-      tired: { low: 1, medium: 2, high: 3 }      // When tired, prefer easy tasks
-    };
-    
-    // Sort tasks based on difficulty weights for the current mood
-    return [...tasks].sort((a, b) => {
-      const weightA = difficultyWeights[currentMood][a.difficulty_level.toLowerCase()] || 2;
-      const weightB = difficultyWeights[currentMood][b.difficulty_level.toLowerCase()] || 2;
-      return weightA - weightB;
-    });
+    return scheduled;
   };
 
   const formatTime = (date: Date): string => {
@@ -146,6 +215,137 @@ const TaskScheduling: React.FC = () => {
     }
   };
 
+  const renderMoodAssessment = () => {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+          <Brain className="mr-2" size={20} /> Mood Assessment
+        </h3>
+        
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <BatteryMedium className="mr-2" size={18} />
+              How exhausted are you? (1-10)
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={moodAssessment.exhaustion}
+              onChange={(e) => handleMoodAssessmentChange('exhaustion', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Not at all (1)</span>
+              <span>Very exhausted (10)</span>
+            </div>
+            <p className="text-center mt-1 font-medium">
+              {moodAssessment.exhaustion}
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Activity className="mr-2" size={18} />
+              How motivated are you feeling? (1-10)
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={moodAssessment.motivation}
+              onChange={(e) => handleMoodAssessmentChange('motivation', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Not motivated (1)</span>
+              <span>Highly motivated (10)</span>
+            </div>
+            <p className="text-center mt-1 font-medium">
+              {moodAssessment.motivation}
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Coffee className="mr-2" size={18} />
+              How focused do you feel right now? (1-10)
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={moodAssessment.focus}
+              onChange={(e) => handleMoodAssessmentChange('focus', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Unfocused (1)</span>
+              <span>Highly focused (10)</span>
+            </div>
+            <p className="text-center mt-1 font-medium">
+              {moodAssessment.focus}
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Activity className="mr-2" size={18} />
+              How stressed are you feeling? (1-10)
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={moodAssessment.stress}
+              onChange={(e) => handleMoodAssessmentChange('stress', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Not stressed (1)</span>
+              <span>Very stressed (10)</span>
+            </div>
+            <p className="text-center mt-1 font-medium">
+              {moodAssessment.stress}
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Smile className="mr-2" size={18} />
+              How would you describe your current feeling?
+            </label>
+            <textarea
+              value={moodAssessment.currentFeeling}
+              onChange={(e) => handleMoodAssessmentChange('currentFeeling', e.target.value)}
+              placeholder="E.g., I'm feeling a bit tired but ready to tackle some work..."
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={3}
+            />
+          </div>
+          
+          <div className="pt-2">
+            <button
+              onClick={generateSchedule}
+              disabled={isScheduling}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+            >
+              {isScheduling ? (
+                "Generating Personalized Schedule..."
+              ) : (
+                <>
+                  <Brain className="mr-2" size={18} />
+                  Generate Personalized Schedule
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (uid === null) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -159,117 +359,92 @@ const TaskScheduling: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4 text-gray-800 flex items-center">
-            <Calendar className="mr-2" size={24} /> Task Scheduling
-          </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Productivity Duration (minutes)
-              </label>
-              <div className="flex items-center">
-                <Clock className="mr-2 text-gray-500" size={20} />
-                <input
-                  type="number"
-                  min="15"
-                  max="480"
-                  value={productivityDuration}
-                  onChange={(e) => setProductivityDuration(parseInt(e.target.value))}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
+        {!isAssessingMood && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800 flex items-center">
+              <Calendar className="mr-2" size={24} /> Task Scheduling
+            </h2>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Scheduling Method
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setSchedulingMethod("deadline")}
-                  className={`p-3 rounded-md flex items-center justify-center ${
-                    schedulingMethod === "deadline" 
-                      ? "bg-blue-100 border-2 border-blue-500 text-blue-700" 
-                      : "bg-gray-100 border border-gray-300 text-gray-700"
-                  }`}
-                >
-                  <Calendar className="mr-2" size={18} />
-                  Deadline-based
-                </button>
-                <button
-                  onClick={() => setSchedulingMethod("mood")}
-                  className={`p-3 rounded-md flex items-center justify-center ${
-                    schedulingMethod === "mood" 
-                      ? "bg-blue-100 border-2 border-blue-500 text-blue-700" 
-                      : "bg-gray-100 border border-gray-300 text-gray-700"
-                  }`}
-                >
-                  <Smile className="mr-2" size={18} />
-                  Mood-based
-                </button>
-              </div>
-            </div>
-            
-            {schedulingMethod === "mood" && (
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Mood
+                  Productivity Duration (minutes)
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center">
+                  <Clock className="mr-2 text-gray-500" size={20} />
+                  <input
+                    type="number"
+                    min="15"
+                    max="480"
+                    value={productivityDuration}
+                    onChange={(e) => setProductivityDuration(parseInt(e.target.value))}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Scheduling Method
+                </label>
+                <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => setMood("energetic")}
-                    className={`p-2 rounded-md flex items-center justify-center ${
-                      mood === "energetic" 
-                        ? "bg-green-100 border-2 border-green-500 text-green-700" 
-                        : "bg-gray-100 border border-gray-300 text-gray-700"
-                    }`}
-                  >
-                    Energetic
-                  </button>
-                  <button
-                    onClick={() => setMood("neutral")}
-                    className={`p-2 rounded-md flex items-center justify-center ${
-                      mood === "neutral" 
+                    onClick={() => setSchedulingMethod("deadline")}
+                    className={`p-3 rounded-md flex items-center justify-center ${
+                      schedulingMethod === "deadline" 
                         ? "bg-blue-100 border-2 border-blue-500 text-blue-700" 
                         : "bg-gray-100 border border-gray-300 text-gray-700"
                     }`}
                   >
-                    Neutral
+                    <Calendar className="mr-2" size={18} />
+                    Deadline-based
                   </button>
                   <button
-                    onClick={() => setMood("tired")}
-                    className={`p-2 rounded-md flex items-center justify-center ${
-                      mood === "tired" 
-                        ? "bg-orange-100 border-2 border-orange-500 text-orange-700" 
+                    onClick={() => setSchedulingMethod("mood")}
+                    className={`p-3 rounded-md flex items-center justify-center ${
+                      schedulingMethod === "mood" 
+                        ? "bg-blue-100 border-2 border-blue-500 text-blue-700" 
                         : "bg-gray-100 border border-gray-300 text-gray-700"
                     }`}
                   >
-                    Tired
+                    <Brain className="mr-2" size={18} />
+                    AI Personalized
                   </button>
                 </div>
               </div>
-            )}
-            
-            <div className="pt-2">
-              <button
-                onClick={generateSchedule}
-                disabled={isScheduling || tasks.length === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
-              >
-                {isScheduling ? (
-                  "Generating Schedule..."
+              
+              <div className="pt-2">
+                {schedulingMethod === "deadline" ? (
+                  <button
+                    onClick={generateSchedule}
+                    disabled={isScheduling || tasks.length === 0}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                  >
+                    {isScheduling ? (
+                      "Generating Schedule..."
+                    ) : (
+                      <>
+                        <List className="mr-2" size={18} />
+                        Generate Schedule
+                      </>
+                    )}
+                  </button>
                 ) : (
-                  <>
-                    <List className="mr-2" size={18} />
-                    Generate Schedule
-                  </>
+                  <button
+                    onClick={startMoodAssessment}
+                    disabled={tasks.length === 0}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                  >
+                    <Brain className="mr-2" size={18} />
+                    Start Mood Assessment
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        
+        {isAssessingMood && renderMoodAssessment()}
         
         {scheduledTasks.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6">
